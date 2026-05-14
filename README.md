@@ -1,5 +1,7 @@
 # mcf-momentum-strategy
 
+[Strategy Output](https://mmax00.github.io/mcf-strategy/)
+
 End-to-end S&P 500 momentum strategy. Pulls 2 years of daily prices for every ticker, computes per-stock momentum features, filters and scores them, builds two portfolios (top-10 by score, and one leader per GICS sector), runs mean-variance optimisation, and writes a self-contained HTML dashboard.
 
 ## Setup
