@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S&amp;P 500 Momentum — {{ meta.generated_at }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f8fafc;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --accent-blue: #2563eb;
+    --accent-green: #16a34a;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 16px; }
+
+  .header { margin-bottom: 12px; }
+  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+  .header .subtitle { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
+  /* ---- Stat pills ---- */
+  .stats-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .stat-pill {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    display: flex; flex-direction: column; align-items: center;
+    min-width: 86px; box-shadow: var(--shadow);
+  }
+  .stat-pill .label {
+    font-size: 9px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 2px;
+  }
+  .stat-pill .value {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600;
+  }
+  .positive { color: var(--accent-green); }
+  .negative { color: var(--accent-red); }
+  .neutral  { color: var(--text-primary); }
+
+  /* ---- Panels ---- */
+  .panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+  }
+  .panel-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-muted);
+    padding: 8px 12px 4px;
+  }
+  .panel-body {
+    padding: 4px 6px 6px;
+    position: relative;
+  }
+
+  .panel-body.chart-box,
+  .panel-body.chart-box-md,
+  .panel-body.chart-box-sm,
+  .panel-body.chart-box-xs,
+  .panel-body.chart-box-tall { overflow: hidden; }
+  .panel-body .plotly-graph-div { width: 100% !important; }
+
+  .scroll-body {
+    overflow-y: auto; max-height: 520px;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .scroll-body::-webkit-scrollbar { width: 6px; }
+  .scroll-body::-webkit-scrollbar-track { background: transparent; }
+  .scroll-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ---- Tables ---- */
+  table { width: 100%; border-collapse: collapse; }
+  thead { position: sticky; top: 0; z-index: 2; }
+  thead th {
+    background: var(--bg-secondary); color: var(--text-muted);
+    font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
+    padding: 5px 8px; text-align: right; white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid var(--border-light); }
+  tbody td {
+    padding: 3px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; text-align: right; white-space: nowrap;
+    color: var(--text-secondary);
+  }
+  tbody td.sym, tbody td.name, tbody td.sector,
+  thead th.sym, thead th.name, thead th.sector { text-align: left; }
+  tbody td.sym { font-weight: 600; color: var(--text-primary); }
+  tbody tr.fail td { color: var(--text-muted); opacity: 0.65; }
+  .flag-on { color: var(--accent-green); font-weight: 600; }
+
+  table.big-table thead th { padding: 10px 14px; font-size: 11px; }
+  table.big-table tbody td { padding: 8px 14px; font-size: 13px; }
+
+  /* ---- Tabs ---- */
+  .tab-bar {
+    display: flex; gap: 0;
+    padding: 0 4px; border-bottom: 1px solid var(--border);
+    overflow-x: auto; scrollbar-width: thin;
+  }
+  .tab-btn {
+    background: none; border: none; color: var(--text-muted);
+    font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    padding: 10px 14px; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--text-secondary); }
+  .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Top-level portfolio selector */
+  .portfolio-switcher {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    margin-top: 16px;
+  }
+  .portfolio-switcher > .tab-bar .tab-btn {
+    font-size: 13px;
+    padding: 14px 20px;
+    letter-spacing: 0.5px;
+  }
+  .portfolio-switcher > .tab-content { padding: 16px; }
+
+  /* Inline sector pill — colors the sector value cell only */
+  .sector-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #1e293b;
+    border: 1px solid rgba(0,0,0,0.08);
+    white-space: nowrap;
+  }
+
+  /* External-link badges (Yahoo Finance + TradingView) next to tickers */
+  .sym-link {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 5px;
+    font-size: 9px;
+    font-weight: 700;
+    text-decoration: none;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+  }
+  .sym-link.y  { color: #6b21a8; background: #f3e8ff; border-color: #e9d5ff; }
+  .sym-link.tv { color: #0e7490; background: #cffafe; border-color: #a5f3fc; }
+  .sym-link:hover { filter: brightness(0.95); text-decoration: none; }
+  h4 .sym-link { font-size: 10px; padding: 2px 8px; margin-left: 8px; }
+  .tab-summary {
+    padding: 8px 14px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  /* ---- Layout helpers ---- */
+  .section-header {
+    font-size: 14px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--accent-blue);
+    margin: 24px 0 12px;
+    padding-bottom: 6px; border-bottom: 2px solid var(--accent-blue);
+  }
+  .section-subheader {
+    font-size: 13px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin: 16px 0 8px;
+  }
+
+  /* ---- Per-symbol tab: chart (wide, full height) + features (colored) ---- */
+  .symbol-layout {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 0;
+    height: 520px;
+  }
+  .symbol-chart-wrap {
+    position: relative;
+    overflow: hidden;
+    border-right: 1px solid var(--border-light);
+  }
+  .symbol-features-wrap {
+    padding: 12px 16px;
+    overflow-y: auto;
+  }
+  .symbol-features-wrap h4 {
+    font-size: 14px; font-weight: 700;
+    margin-bottom: 8px; color: var(--text-primary);
+  }
+  .symbol-features-wrap .symbol-sub {
+    color: var(--text-muted); font-size: 11px; margin-bottom: 12px;
+  }
+  table.kv-table { width: 100%; }
+  table.kv-table tr { border-bottom: 1px solid rgba(0,0,0,0.06); }
+  table.kv-table tr:last-child { border-bottom: none; }
+  table.kv-table td {
+    padding: 5px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  table.kv-table td.label {
+    color: var(--text-secondary);
+    text-align: left; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.4px;
+    font-size: 10px;
+    font-family: 'Inter', sans-serif;
+  }
+  table.kv-table td.value {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary);
+    text-align: right; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1>S&amp;P 500 Momentum</h1>
+    <div class="subtitle">
+      Generated {{ meta.generated_at }} &middot;
+      ${{ '{:,}'.format(meta.capital) }} capital &middot;
+      weights &isin; [{{ '%.0f%%' | format(meta.w_min * 100) }}, {{ '%.0f%%' | format(meta.w_max * 100) }}] &middot;
+      {{ meta.n_total }} scanned, {{ meta.n_eligible }} eligible
+    </div>
+  </div>
+
+  <!-- All stocks & features -->
+  <div class="panel">
+    <div class="panel-title">All Stocks &amp; Features &middot; {{ features_rows | length }} scanned</div>
+    <div class="panel-body scroll-body" style="padding: 0;">
+      <table>
+        <thead>
+          <tr>
+            <th class="sym">Symbol</th>
+            <th class="name">Name</th>
+            <th class="sector">Sector</th>
+            <th>Price</th>
+            <th>Vol 1y</th>
+            <th>Mean Ret 1y</th>
+            <th>Beta</th>
+            <th>Market Cap</th>
+            <th>Score</th>
+            <th>Risk-Adj 6M</th>
+            <th>Comp Mom</th>
+            <th>RS vs SPY</th>
+            <th>Dist 52wH</th>
+            <th>Brk</th>
+            <th>MA&uarr;</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in features_rows %}
+          <tr class="{% if not r.passed %}fail{% endif %}">
+            <td class="sym">{{ r.symbol }}<a class="sym-link y" href="{{ r.yahoo_url }}" target="_blank" rel="noopener" title="Yahoo Finance">Y</a><a class="sym-link tv" href="{{ r.tv_url }}" target="_blank" rel="noopener" title="TradingView">TV</a></td>
+            <td class="name">{{ r.name }}</td>
+            <td class="sector"><span class="sector-pill" style="background-color: {{ r.sector_color }};">{{ r.sector }}</span></td>
+            <td>{{ r.price }}</td>
+            <td>{{ r.vol_1y }}</td>
+            <td class="{{ r.mean_return_cls }}">{{ r.mean_return }}</td>
+            <td>{{ r.beta }}</td>
+            <td>{{ r.market_cap }}</td>
+            <td class="neutral">{{ r.composite_score }}</td>
+            <td>{{ r.ret_6m_risk_adj }}</td>
+            <td>{{ r.composite_momentum }}</td>
+            <td>{{ r.rel_strength }}</td>
+            <td>{{ r.dist_52w_high }}</td>
+            <td class="{% if r.breakout %}flag-on{% endif %}">{{ '✓' if r.breakout else '' }}</td>
+            <td class="{% if r.ma_cross %}flag-on{% endif %}">{{ '✓' if r.ma_cross else '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sector Distribution of eligible universe -->
+  <div class="panel" style="margin-top: 12px;">
+    <div class="panel-title">Sector Distribution — Eligible Stocks</div>
+    <div class="panel-body chart-box-md">{{ sector_html | safe }}</div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- Portfolio analyses — outer selector switches between the two  -->
+  <!-- ============================================================= -->
+  <div class="portfolio-switcher">
+    <div class="tab-bar">
+      {% for p in portfolios %}
+      <button class="tab-btn {% if loop.first %}active{% endif %}" data-tab="portfolio-{{ p.prefix }}">{{ p.label }}</button>
+      {% endfor %}
+    </div>
+
+  {% for p in portfolios %}
+  <div class="tab-content {% if loop.first %}active{% endif %}" id="portfolio-{{ p.prefix }}">
+
+  <!-- Portfolio stat pills -->
+  <div class="stats-row">
+    <div class="stat-pill"><span class="label">MVP μ</span><span class="value positive">{{ '%+.1f'|format(p.mvp.er * 100) }}%</span></div>
+    <div class="stat-pill"><span class="label">MVP σ</span><span class="value neutral">{{ '%.1f'|format(p.mvp.vol * 100) }}%</span></div>
+    <div class="stat-pill"><span class="label">MSR μ</span><span class="value positive">{{ '%+.1f'|format(p.msr.er * 100) }}%</span></div>
+    <div class="stat-pill"><span class="label">MSR σ</span><span class="value neutral">{{ '%.1f'|format(p.msr.vol * 100) }}%</span></div>
+    <div class="stat-pill"><span class="label">MSR Sharpe</span><span class="value {{ 'positive' if p.msr.sharpe > 1 else 'neutral' }}">{{ '%.2f'|format(p.msr.sharpe) }}</span></div>
+  </div>
+
+  <!-- Efficient Frontier -->
+  <div class="panel">
+    <div class="panel-title">Efficient Frontier</div>
+    <div class="panel-body chart-box">{{ p.frontier_html | safe }}</div>
+  </div>
+
+  <!-- Portfolio allocation with MSR/MVP tabs -->
+  <div class="panel" style="margin-top: 12px;">
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="{{ p.prefix }}-alloc-msr">Max Sharpe</button>
+      <button class="tab-btn" data-tab="{{ p.prefix }}-alloc-mvp">Min Variance</button>
+    </div>
+
+    {% for alloc in [('msr', 'MSR', p.msr_rows, p.msr, p.msr_invested, p.msr_cash_left, p.msr_sector_usd_html),
+                     ('mvp', 'MVP', p.mvp_rows, p.mvp, p.mvp_invested, p.mvp_cash_left, p.mvp_sector_usd_html)] %}
+    <div class="tab-content {% if loop.first %}active{% endif %}" id="{{ p.prefix }}-alloc-{{ alloc[0] }}">
+      <div class="tab-summary">
+        μ = {{ '%+.1f'|format(alloc[3].er * 100) }}% &middot;
+        σ = {{ '%.1f'|format(alloc[3].vol * 100) }}%
+        {% if 'sharpe' in alloc[3] %} &middot; Sharpe = {{ '%.2f'|format(alloc[3].sharpe) }}{% endif %} &middot;
+        Invested ${{ '{:,.0f}'.format(alloc[4]) }} &middot;
+        Cash ${{ '{:,.0f}'.format(alloc[5]) }}
+      </div>
+      <div class="panel-body chart-box-sm">{{ alloc[6] | safe }}</div>
+      <div class="panel-body" style="padding: 0;">
+        <table class="big-table">
+          <thead>
+            <tr>
+              <th class="sym">Symbol</th>
+              <th class="name">Name</th>
+              <th class="sector">Sector</th>
+              <th>Price</th>
+              <th>Mean Ret</th>
+              <th>Vol</th>
+              <th>Beta</th>
+              <th>Target W</th>
+              <th>Target $</th>
+              <th>Shares</th>
+              <th>Invested $</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in alloc[2] %}
+            <tr>
+              <td class="sym">{{ r.symbol }}<a class="sym-link y" href="{{ r.yahoo_url }}" target="_blank" rel="noopener" title="Yahoo Finance">Y</a><a class="sym-link tv" href="{{ r.tv_url }}" target="_blank" rel="noopener" title="TradingView">TV</a></td>
+              <td class="name">{{ r.name }}</td>
+              <td class="sector"><span class="sector-pill" style="background-color: {{ r.sector_color }};">{{ r.sector }}</span></td>
+              <td>{{ r.price }}</td>
+              <td class="positive">{{ r.mean_return }}</td>
+              <td>{{ r.vol_1y }}</td>
+              <td>{{ r.beta }}</td>
+              <td>{{ r.target_weight }}</td>
+              <td>{{ r.target_dollars }}</td>
+              <td class="neutral">{{ r.shares }}</td>
+              <td>{{ r.invested }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Portfolio Correlation -->
+  <div class="panel" style="margin-top: 12px;">
+    <div class="panel-title">Portfolio Correlation</div>
+    <div class="panel-body chart-box-md">{{ p.corr_html | safe }}</div>
+  </div>
+
+  <!-- Selected Symbols — tab per symbol -->
+  <h3 class="section-subheader">Selected Symbols &middot; Price Charts &amp; Features</h3>
+  <div class="panel">
+    <div class="tab-bar">
+      {% for sec in p.symbol_sections %}
+      <button class="tab-btn {% if loop.first %}active{% endif %}"
+              data-tab="{{ p.prefix }}-sym-tab-{{ sec.symbol }}">{{ sec.symbol }}</button>
+      {% endfor %}
+    </div>
+    {% for sec in p.symbol_sections %}
+    <div class="tab-content {% if loop.first %}active{% endif %}" id="{{ p.prefix }}-sym-tab-{{ sec.symbol }}">
+      <div class="symbol-layout">
+        <div class="symbol-chart-wrap">{{ sec.chart_html | safe }}</div>
+        <div class="symbol-features-wrap">
+          <h4>
+            {{ sec.symbol }} — {{ sec.name }}
+            <a class="sym-link y" href="{{ sec.yahoo_url }}" target="_blank" rel="noopener" title="Yahoo Finance">Yahoo</a>
+            <a class="sym-link tv" href="{{ sec.tv_url }}" target="_blank" rel="noopener" title="TradingView">TradingView</a>
+          </h4>
+          <div class="symbol-sub"><span class="sector-pill" style="background-color: {{ sec.sector_color }};">{{ sec.sector }}</span></div>
+          <table class="kv-table">
+            {% for label, val in sec.features %}
+            <tr>
+              <td class="label">{{ label }}</td>
+              <td class="value">{% if label == 'Sector' %}<span class="sector-pill" style="background-color: {{ sec.sector_color }};">{{ val }}</span>{% else %}{{ val }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  </div>
+  {% endfor %}
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      // Scope to the container whose direct children are this bar's tab-bar + tab-contents.
+      var bar = btn.parentElement;
+      var container = bar.parentElement;
+      bar.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      Array.prototype.forEach.call(container.children, function (child) {
+        if (child.classList.contains('tab-content')) child.classList.remove('active');
+      });
+      btn.classList.add('active');
+      var active = document.getElementById(btn.dataset.tab);
+      active.classList.add('active');
+      active.querySelectorAll('.plotly-graph-div').forEach(function (el) {
+        if (window.Plotly) Plotly.Plots.resize(el);
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
